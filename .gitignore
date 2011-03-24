@@ -1,0 +1,7 @@
+lib_managed/
+target/
+project/boot/
+project/plugins/lib_managed/
+project/plugins/project/
+project/plugins/src_managed/
+src_managed/
