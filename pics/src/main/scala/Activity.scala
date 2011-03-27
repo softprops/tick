@@ -40,11 +40,7 @@ class MainActivity extends Activity {
   lazy val sep = findViewById(R.id.sep).asInstanceOf[TextView]
   lazy val mTens = findViewById(R.id.m_tens).asInstanceOf[ImageView]
   lazy val mOnes = findViewById(R.id.m_ones).asInstanceOf[ImageView]
-  lazy val meridiem: TextView = findViewById(R.id.meridiem).asInstanceOf[TextView]/* new TextView(this) {
-    setTextSize(TypedValue.COMPLEX_UNIT_DIP, 20f)
-    setTypeface(Typeface.SERIF, Typeface.ITALIC)
-    setBackgroundResource(R.drawable.roundcorner)
-  }*/
+  lazy val meridiem: TextView = findViewById(R.id.meridiem).asInstanceOf[TextView]
 
   def tick() {
     val t = Calendar.getInstance().getTime().getTime
@@ -60,22 +56,6 @@ class MainActivity extends Activity {
     }
     meridiem.setText(new SimpleDateFormat("aa").format(t).toLowerCase)
   }
-
-  def digit =
-    new ImageView(this) {
-      setOnClickListener(new View.OnClickListener {
-        def onClick(v: View) = {
-          toast("clicked %s" format v)
-          selectPic(Ht)
-        }
-      })
-    }
-
-  def textDigit =
-    new TextView(this) {
-      setTextSize(TypedValue.COMPLEX_UNIT_DIP, 180f)
-      setTypeface(Typeface.SERIF)
-    }
 
   override def onCreate(savedInstanceState: Bundle) {
     super.onCreate(savedInstanceState)
