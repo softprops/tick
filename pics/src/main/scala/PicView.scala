@@ -1,21 +1,9 @@
 package me.lessis
 
-import android.app.{Activity, NotificationManager}
-import android.os.{Bundle, Environment=> Env, Handler}
-import android.widget.{ImageView, TextView, Toast, LinearLayout}
-import android.content.{BroadcastReceiver, Context,
-                        ContentResolver, Intent, IntentFilter}
-import android.graphics.{Typeface}
-import android.provider.MediaStore
-import MediaStore.Images
-import android.view.{Gravity, View, Window, WindowManager}
-import android.util.{Log, TypedValue, AttributeSet}
-import android.graphics.{Bitmap, Canvas, Color, Paint,
-                        PorterDuffXfermode, PorterDuff, RectF, Path}
-import android.net.Uri
-import java.util.Calendar
-import java.text.SimpleDateFormat
-import java.io.File
+import android.widget.ImageView
+import android.content.Context
+import android.util.AttributeSet
+import android.graphics.{Canvas, RectF, Path}
 
 abstract class PicView(context: Context,  attrs: AttributeSet, defStyle: Int)
   extends ImageView(context, attrs, defStyle) {
