@@ -1,8 +1,8 @@
-package me.lessis
+ package me.lessis
 
 import android.app.{Activity, NotificationManager}
-import android.os.{Bundle, Environment, Handler}
-import android.widget.{ImageView, TextView, Toast, LinearLayout}
+import android.os.{Bundle, Environment=> Env, Handler}
+import android.widget.{ImageView, TextView, LinearLayout}
 import android.content.{BroadcastReceiver, Context,
                         ContentResolver, Intent, IntentFilter}
 import android.graphics.{Typeface}
@@ -10,19 +10,24 @@ import android.provider.MediaStore
 import MediaStore.Images
 import android.view.{Gravity, View, Window, WindowManager}
 import android.util.{Log, TypedValue}
-import android.graphics.Bitmap
+import android.graphics.{Bitmap, Canvas, Color, Paint,
+                        PorterDuffXfermode, PorterDuff, RectF}
 import android.net.Uri
+import android.hardware.{Sensor, SensorEvent, SensorEventListener,
+                       SensorManager}
+
 import java.util.Calendar
 import java.text.SimpleDateFormat
 import java.io.File
 
-class MainActivity extends Activity {
+object MainActivity {
+  val DigitWidth = 200
+  val DigitHeight = 360
+}
 
-  val Ht = 1
-  val Ho = 2
-  val Mt = 3
-  val Mo = 4
-  val CroppedImage = 5
+
+class MainActivity extends Activity with Toasted {
+  import MainActivity._
 
   val mHandler = new Handler()
   val rcvr = new BroadcastReceiver() {
@@ -35,37 +40,53 @@ class MainActivity extends Activity {
     }
   }
 
-  lazy val hTens = findViewById(R.id.h_tens).asInstanceOf[ImageView]
-  lazy val hOnes = findViewById(R.id.h_ones).asInstanceOf[ImageView]
-  lazy val sep = findViewById(R.id.sep).asInstanceOf[TextView]
-  lazy val mTens = findViewById(R.id.m_tens).asInstanceOf[ImageView]
-  lazy val mOnes = findViewById(R.id.m_ones).asInstanceOf[ImageView]
-  lazy val meridiem: TextView = findViewById(R.id.meridiem).asInstanceOf[TextView]
+  val sense = new SensorEventListener {
+    def onAccuracyChanged(sensor: Sensor, accuracy:Int) { toast("accuracy changed") }
+    def onSensorChanged(evt: SensorEvent) { /*toast("sensor changed") */}
+    //private def deleteFiles = (0 to 10).foreach(toast)
+  }
+
+  lazy val hTens = view[PicView](R.id.h_tens)
+  lazy val hOnes = view[PicView](R.id.h_ones)
+  lazy val mTens = view[PicView](R.id.m_tens)
+  lazy val mOnes = view[PicView](R.id.m_ones)
+  lazy val meridiem = view[TextView](R.id.meridiem)
+  lazy val sensorManager = getSystemService("sensor"/*Activity.SENSOR_SERVICE*/).
+                              asInstanceOf[SensorManager]
 
   def tick() {
     val t = Calendar.getInstance().getTime().getTime
     new SimpleDateFormat("hh").format(t).split("") match {
       case Array(_, tens, ones) =>
-        hTens.setImageResource(num(tens))
-      hOnes.setImageResource(num(ones))
+        applyNum(hTens, tens.toInt)
+        applyNum(hOnes, ones.toInt)
     }
     new SimpleDateFormat("mm").format(t).split("") match {
       case Array(_, tens, ones) =>
-        mTens.setImageResource(num(tens))
-        mOnes.setImageResource(num(ones))
+        applyNum(mTens, tens.toInt)
+        applyNum(mOnes, ones.toInt)
     }
-    meridiem.setText(new SimpleDateFormat("aa").format(t).toLowerCase)
+    meridiem.setText(
+      new SimpleDateFormat("aa").format(t).toLowerCase
+    )
   }
 
   override def onCreate(savedInstanceState: Bundle) {
     super.onCreate(savedInstanceState)
     requestWindowFeature(Window.FEATURE_NO_TITLE)
     setContentView(R.layout.clock)
-    (hTens :: hOnes :: mTens :: mOnes :: Nil).view.zipWithIndex foreach {
-      case (view, i) => view.setOnClickListener(new View.OnClickListener {
-        def onClick(v: View) = selectPic(i + 1)
+
+    (hTens :: hOnes :: mTens :: mOnes :: Nil) foreach {
+      _.setOnClickListener(new View.OnClickListener {
+        def onClick(v: View) = {
+          new JumpDialog(MainActivity.this, new OnJumpListener {
+            def onJump(c: CharSequence) = selectPic(c.toString.toInt)
+          }).numbers.inRowsOf(5).show()
+          quickToast("Select a digit")
+        }
       })
     }
+
     getWindow().setFlags(
       WindowManager.LayoutParams.FLAG_BLUR_BEHIND,
       WindowManager.LayoutParams.FLAG_BLUR_BEHIND
@@ -90,6 +111,7 @@ class MainActivity extends Activity {
     tick()
   }
 
+  /** @param which of 0-9 */
   private def selectPic(which: Int) =
     startActivityForResult(
       new Intent(
@@ -100,56 +122,51 @@ class MainActivity extends Activity {
       }, which
     )
 
-  protected val cropFile =
-    Uri.fromFile(new File(Environment.getExternalStorageDirectory(), "TEMP_TICK_IMG" + ".jpg"))
-
+  /** @param reqCode 0-9 indicates an image was selected, a masked 4th bit
+   *                 indicates a cropping result of 0-9's image */
   protected override def onActivityResult(
     reqCode: Int, resCode: Int, data: Intent
   ) =
     reqCode match {
-      case CroppedImage =>
-         toast("wee cropped data %s" format(data.getData) )
-         /*val extras = data.getExtras()
-         if(extras == null) toast("no extras")
-         else {
-              val parcelable = extras.getParcelable("data")
-              if(parcelable == null) toast("no parsable data returned")
-              else {
-                 toast("got parsable data %s" format parcelable)
-              }
-         }*/
-         Images.Media.getBitmap(getContentResolver(), cropFile) match {
-           case null => toast("failed to retrieve cropFile %s" format cropFile)
-           case bm =>
-             toast("win %s" format bm)
-             hTens.setImageBitmap(bm)
+      case n if((n & (1<<4)) > 0) =>
+         resCode match {
+           case Activity.RESULT_OK =>
+             val dig = n & ~(1<<4)
+             Images.Media.getBitmap(getContentResolver(), croppedFile(dig)) match {
+               case null => toast(
+                 "failed to retrieve cropFile %s" format croppedFile(dig)
+               )
+               case bm => // todo inplace update current digits, if number
+             }
+           case _ => toast("unexpected result code %s" format resCode)
          }
-      case Ht | Ho | Mt | Mo =>
+      case 0|1|2|3|4|5|6|7|8|9 =>
         resCode match {
           case Activity.RESULT_OK =>
             val uri = data.getData
-            toast("got uri %s" format uri)
             val crop = new Intent("com.android.camera.action.CROP") {
-              //setClassName("com.android.camera", "com.android.camera.CropImage")
               setType("image/*")
             }
-            getPackageManager().queryIntentActivities(crop,0) match {
-               case null => toast("could not find a cropping intent for uri %s :(" format uri)
+            getPackageManager().queryIntentActivities(crop, 0) match {
+               case null => toast(
+                 "could not find a cropping intent for uri %s :(" format uri
+               )
                case ia =>
-                 toast("intent activities %s" format ia)
-                 Environment.getExternalStorageState() match {
-                   case Environment.MEDIA_MOUNTED =>
-                     toast("going to save data in uri %s" format cropFile)
+                 Env.getExternalStorageState() match {
+                   case Env.MEDIA_MOUNTED =>
                      crop.setData(uri)
                      crop.putExtra("scale", false)
-                     crop.putExtra("outputX", 100)
-                     crop.putExtra("outputY", 240)
-                     crop.putExtra("aspectX", 1)
-                     crop.putExtra("aspectY", 1)
-                     crop.putExtra(MediaStore.EXTRA_OUTPUT, cropFile)
-                     //crop.putExtra("return-data", true) // write to a tmp file (cropFile), return-data is broke
-                     startActivityForResult(crop, CroppedImage)
-                   case s => toast("got unexpected ext media storage state %s" format s)
+                     crop.putExtra("outputX", DigitWidth)
+                     crop.putExtra("outputY", DigitHeight)
+                     crop.putExtra("aspectX", DigitWidth)
+                     crop.putExtra("aspectY", DigitHeight)
+                     crop.putExtra(
+                       MediaStore.EXTRA_OUTPUT, croppedFile(reqCode)
+                     )
+                     startActivityForResult(crop, reqCode | (1<<4))
+                   case s => toast(
+                     "got unexpected ext media storage state %s" format s
+                   )
                  }
             }
           case er => toast("unexpected result code %s" format er)
@@ -157,22 +174,48 @@ class MainActivity extends Activity {
         case c => toast("unexpected response Code %s" format c)
       }
 
-  private def view(id: Int) = findViewById(id)
+  protected override def onPause() {
+    super.onPause()
+    sensorManager.unregisterListener(sense)
+  }
 
-  private def toast(msg: String) =
-    Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
+  protected override def onResume() {
+    super.onResume()
+    /*sensorManager.registerListener(
+       sense,
+       sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER),
+       SensorManager.SENSOR_DELAY_UI
+    )*/
+  }
 
-  private def num(n: String) =
+  private def croppedFile(n: Int) =
+    Uri.fromFile(new File(
+      Env.getExternalStorageDirectory(), "tickpic_%s.jpg" format n
+    ))
+
+  private def view[T <: View](id: Int): T = findViewById(id).asInstanceOf[T]
+
+  private def applyNum(pv: PicView, n: Int) =
+    try {
+      Images.Media.getBitmap(getContentResolver(), croppedFile(n)) match {
+        case null => pv.setImageResource(default(n))
+        case bm => pv.setImageBitmap(bm)
+      }
+    } catch { case _ =>
+      pv.setImageResource(default(n))
+    }
+
+  private def default(n: Int) =
     n match {
-      case "0" => R.drawable.n_0
-      case "1" => R.drawable.n_1
-      case "2" => R.drawable.n_2
-      case "3" => R.drawable.n_3
-      case "4" => R.drawable.n_4
-      case "5" => R.drawable.n_5
-      case "6" => R.drawable.n_6
-      case "7" => R.drawable.n_7
-      case "8" => R.drawable.n_8
-      case "9" => R.drawable.n_9
+      case 0 => R.drawable.n_0
+      case 1 => R.drawable.n_1
+      case 2 => R.drawable.n_2
+      case 3 => R.drawable.n_3
+      case 4 => R.drawable.n_4
+      case 5 => R.drawable.n_5
+      case 6 => R.drawable.n_6
+      case 7 => R.drawable.n_7
+      case 8 => R.drawable.n_8
+      case 9 => R.drawable.n_9
     }
 }
