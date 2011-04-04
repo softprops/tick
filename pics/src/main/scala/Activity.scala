@@ -19,14 +19,13 @@ import java.io.File
 import java.net.{URL, HttpURLConnection}
 
 object MainActivity {
-  val DigitWidth = 125//175
-  val DigitHeight = 220//360
+  val DigitWidth = 125
+  val DigitHeight = 220
   val DigitsPref = "digits"
   val SourcePref = "via"
   val SourceOption = "src"
   val DeviceValue = "device"
   val PicplzValue = "picplz"
-  val SourceDevice = 1
 }
 
 object PicPlz {
@@ -41,17 +40,17 @@ trait RemoteFiles {
     con.connect()
     using(con.getInputStream) { in =>
       BitmapFactory.decodeStream(in)
-    }
+                             }
   }
 
   def using[C <: {  def close() }, T](c: C)(f: C => T): T =
     try f(c)
-    finally c.close()
+  finally c.close()
 }
 
 
 class MainActivity extends Activity
-  with Toasted with Shaking with Prefs {
+with Toasted with Shaking with Prefs {
   import MainActivity._
 
   val mHandler = new Handler()
@@ -78,7 +77,7 @@ class MainActivity extends Activity
     try {
       (0 to 9).foreach({ n =>
         edit(DigitsPref) { _.remove("i_%s" format n) }
-      })
+                      })
       tick()
     } catch { case e => toast("err %s" format e) }
 
@@ -90,12 +89,12 @@ class MainActivity extends Activity
     new SimpleDateFormat("hh").format(t).split("") match {
       case Array(_, tens, ones) =>
         applyNum(hTens, tens.toInt)
-        applyNum(hOnes, ones.toInt)
+      applyNum(hOnes, ones.toInt)
     }
     new SimpleDateFormat("mm").format(t).split("") match {
       case Array(_, tens, ones) =>
         applyNum(mTens, tens.toInt)
-        applyNum(mOnes, ones.toInt)
+      applyNum(mOnes, ones.toInt)
     }
     meridiem.setText(
       new SimpleDateFormat("aa").format(t).toLowerCase
@@ -151,7 +150,8 @@ class MainActivity extends Activity
   override def onOptionsItemSelected(item: MenuItem) = item.getItemId match {
     case R.id.via => true
     case R.id.use_device =>
-      edit(SourcePref) { _.putString(SourceOption, DeviceValue) }; true
+      edit(SourcePref) { _.putString(SourceOption, DeviceValue) }
+      true
     case R.id.use_picplz =>
       edit(SourcePref) { _.putString(SourceOption, PicplzValue) }
       oauthPicplz
