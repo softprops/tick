@@ -3,7 +3,7 @@
           package="me.lessis"
           xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-sdk android:minSdkVersion="8"></uses-sdk>
-    <application android:icon="@drawable/android:star_big_on"
+    <application android:icon="@drawable/android:ic_menu_camera"
                  android:label="@string/app_name">
       <activity android:label="@string/app_name"
                 android:name=".MainActivity"
@@ -11,8 +11,13 @@
          <intent-filter>
            <action android:name="android.intent.action.MAIN"></action>
            <category android:name="android.intent.category.LAUNCHER"></category>
+           <action android:name="android.intent.action.VIEW" />
+           <category android:name="android.intent.category.DEFAULT" />
+           <category android:name="android.intent.category.BROWSABLE" />
+           <data android:scheme="picsee" />
           </intent-filter>
       </activity>
       <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+      <uses-permission android:name="android.permission.DELETE_EXTERNAL_STORAGE" />
     </application>>
 </manifest>

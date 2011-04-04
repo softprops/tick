@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@+id/via"
+          android:icon="@drawable/android:ic_menu_camera"
+          android:title="@string/via_opt">
+         <menu>
+            <item android:id="@+id/use_device"
+                  android:title="@string/use_device" />
+            <item android:id="@+id/use_picplz"
+                  android:title="@string/use_picplz" />
+        </menu>
+    </item>
+</menu>

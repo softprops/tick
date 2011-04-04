@@ -1,58 +1,89 @@
- package me.lessis
+package me.lessis
 
 import android.app.{Activity, NotificationManager}
 import android.os.{Bundle, Environment=> Env, Handler}
 import android.widget.{ImageView, TextView, LinearLayout}
 import android.content.{BroadcastReceiver, Context,
                         ContentResolver, Intent, IntentFilter}
-import android.graphics.{Typeface}
 import android.provider.MediaStore
+import android.util.Log
 import MediaStore.Images
-import android.view.{Gravity, View, Window, WindowManager}
-import android.util.{Log, TypedValue}
-import android.graphics.{Bitmap, Canvas, Color, Paint,
-                        PorterDuffXfermode, PorterDuff, RectF}
+import android.view.{ContextMenu, Menu, MenuItem, View, Window, WindowManager}
+import android.graphics.{Bitmap,BitmapFactory}
 import android.net.Uri
-import android.hardware.{Sensor, SensorEvent, SensorEventListener,
-                       SensorManager}
 
 import java.util.Calendar
 import java.text.SimpleDateFormat
 import java.io.File
 
+import java.net.{URL, HttpURLConnection}
+
 object MainActivity {
-  val DigitWidth = 200
-  val DigitHeight = 360
+  val DigitWidth = 125//175
+  val DigitHeight = 220//360
+  val DigitsPref = "digits"
+  val SourcePref = "via"
+  val SourceOption = "src"
+  val DeviceValue = "device"
+  val PicplzValue = "picplz"
+  val SourceDevice = 1
+}
+
+object PicPlz {
+  val ClientId = "CbRLCGphEJ3CPANX98SfucGvwNQ7VzR4"
+}
+
+trait RemoteFiles {
+
+  def get(from: URL): Bitmap = {
+    val con = from.openConnection().asInstanceOf[HttpURLConnection]
+    con.setDoInput(true)
+    con.connect()
+    using(con.getInputStream) { in =>
+      BitmapFactory.decodeStream(in)
+    }
+  }
+
+  def using[C <: {  def close() }, T](c: C)(f: C => T): T =
+    try f(c)
+    finally c.close()
 }
 
 
-class MainActivity extends Activity with Toasted {
+class MainActivity extends Activity
+  with Toasted with Shaking with Prefs {
   import MainActivity._
 
   val mHandler = new Handler()
   val rcvr = new BroadcastReceiver() {
-    def onReceive(cxt: Context, intent: Intent) = intent.getAction() match {
-      case Intent.ACTION_TIME_TICK | Intent.ACTION_TIME_CHANGED |
-      Intent.ACTION_TIMEZONE_CHANGED =>
-        mHandler.post(new Runnable() {
-          def run = tick()
-        })
-    }
+    def onReceive(cxt: Context, intent: Intent) =
+      intent.getAction() match {
+        case Intent.ACTION_TIME_TICK | Intent.ACTION_TIME_CHANGED |
+        Intent.ACTION_TIMEZONE_CHANGED =>
+          mHandler.post(new Runnable() {
+            def run = tick()
+          })
+      }
   }
 
-  val sense = new SensorEventListener {
-    def onAccuracyChanged(sensor: Sensor, accuracy:Int) { toast("accuracy changed") }
-    def onSensorChanged(evt: SensorEvent) { /*toast("sensor changed") */}
-    //private def deleteFiles = (0 to 10).foreach(toast)
-  }
+  lazy val hTens = view[PicViewL](R.id.h_tens)
+  lazy val hOnes = view[PicViewR](R.id.h_ones)
 
-  lazy val hTens = view[PicView](R.id.h_tens)
-  lazy val hOnes = view[PicView](R.id.h_ones)
-  lazy val mTens = view[PicView](R.id.m_tens)
-  lazy val mOnes = view[PicView](R.id.m_ones)
+  lazy val mTens = view[PicViewL](R.id.m_tens)
+  lazy val mOnes = view[PicViewR](R.id.m_ones)
+
   lazy val meridiem = view[TextView](R.id.meridiem)
-  lazy val sensorManager = getSystemService("sensor"/*Activity.SENSOR_SERVICE*/).
-                              asInstanceOf[SensorManager]
+
+  def onShake =
+    try {
+      (0 to 9).foreach({ n =>
+        edit(DigitsPref) { _.remove("i_%s" format n) }
+      })
+      tick()
+    } catch { case e => toast("err %s" format e) }
+
+  override def onShakeUnsupported =
+    toast("This device does not support shaking")
 
   def tick() {
     val t = Calendar.getInstance().getTime().getTime
@@ -76,14 +107,13 @@ class MainActivity extends Activity with Toasted {
     requestWindowFeature(Window.FEATURE_NO_TITLE)
     setContentView(R.layout.clock)
 
+    val selections = new JumpDialog(MainActivity.this, new OnJumpListener {
+      def onJump(c: CharSequence) = select(c.toString.toInt)
+    }).numbers.inRowsOf(5)
+
     (hTens :: hOnes :: mTens :: mOnes :: Nil) foreach {
       _.setOnClickListener(new View.OnClickListener {
-        def onClick(v: View) = {
-          new JumpDialog(MainActivity.this, new OnJumpListener {
-            def onJump(c: CharSequence) = selectPic(c.toString.toInt)
-          }).numbers.inRowsOf(5).show()
-          quickToast("Select a digit")
-        }
+        def onClick(v: View) = selections.show()
       })
     }
 
@@ -111,16 +141,69 @@ class MainActivity extends Activity with Toasted {
     tick()
   }
 
+  /** show options for selecting where source images come from */
+  override def onCreateOptionsMenu(menu: Menu) = {
+    getMenuInflater().inflate(R.menu.clock_menu, menu)
+    true
+  }
+
+  /** handle option selections */
+  override def onOptionsItemSelected(item: MenuItem) = item.getItemId match {
+    case R.id.via => true
+    case R.id.use_device =>
+      edit(SourcePref) { _.putString(SourceOption, DeviceValue) }; true
+    case R.id.use_picplz =>
+      edit(SourcePref) { _.putString(SourceOption, PicplzValue) }
+      oauthPicplz
+      true
+    case _ => super.onOptionsItemSelected(item)
+  }
+
   /** @param which of 0-9 */
-  private def selectPic(which: Int) =
-    startActivityForResult(
-      new Intent(
-        Intent.ACTION_PICK,
-        Images.Media.INTERNAL_CONTENT_URI
-      ) {
-        setType("image/*")
-      }, which
-    )
+  private def select(which: Int) =
+    prefs(SourcePref).getString(SourceOption, DeviceValue) match {
+      case DeviceValue =>
+        startActivityForResult(
+          new Intent(
+            Intent.ACTION_PICK,
+            Images.Media.INTERNAL_CONTENT_URI
+          ) {
+            setType("image/*")
+          }, which
+        )
+      case PicplzValue =>
+        prefs("oauth").getString("picplz-token", null) match {
+          case null => oauthPicplz
+          case token => toast("not quite there yet with picplz, try via device")
+        }
+    }
+
+    private def oauthPicplz = {
+      val intent = new Intent(Intent.ACTION_VIEW)
+      intent.setData(
+        Uri.parse(
+          "https://picplz.com/oauth2/authenticate?client_id=%s&response_type=code&redirect_uri=picsee://" format PicPlz.ClientId
+        )
+      )
+      startActivity(intent)
+    }
+
+  override def onResume() = {
+    super.onResume()
+    getIntent().getData() match {
+      case null => ()
+      case uri: Uri =>
+        uri.getQueryParameter("code") match {
+          case null =>
+            uri.getQueryParameter("error") match {
+               case null => ()
+               case err => toast("oauth error %s" format err)
+            }
+          case code =>
+            edit("oauth") { _.putString("picplz-token", code) }
+       }
+    }
+  }
 
   /** @param reqCode 0-9 indicates an image was selected, a masked 4th bit
    *                 indicates a cropping result of 0-9's image */
@@ -128,19 +211,8 @@ class MainActivity extends Activity with Toasted {
     reqCode: Int, resCode: Int, data: Intent
   ) =
     reqCode match {
-      case n if((n & (1<<4)) > 0) =>
-         resCode match {
-           case Activity.RESULT_OK =>
-             val dig = n & ~(1<<4)
-             Images.Media.getBitmap(getContentResolver(), croppedFile(dig)) match {
-               case null => toast(
-                 "failed to retrieve cropFile %s" format croppedFile(dig)
-               )
-               case bm => // todo inplace update current digits, if number
-             }
-           case _ => toast("unexpected result code %s" format resCode)
-         }
-      case 0|1|2|3|4|5|6|7|8|9 =>
+      // selected
+      case 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 =>
         resCode match {
           case Activity.RESULT_OK =>
             val uri = data.getData
@@ -161,45 +233,69 @@ class MainActivity extends Activity with Toasted {
                      crop.putExtra("aspectX", DigitWidth)
                      crop.putExtra("aspectY", DigitHeight)
                      crop.putExtra(
-                       MediaStore.EXTRA_OUTPUT, croppedFile(reqCode)
+                       MediaStore.EXTRA_OUTPUT, croppedUri(reqCode)
                      )
                      startActivityForResult(crop, reqCode | (1<<4))
-                   case s => toast(
-                     "got unexpected ext media storage state %s" format s
+                   case state => toast(
+                     "got unexpected ext media storage state (%s)" format state
                    )
                  }
             }
-          case er => toast("unexpected result code %s" format er)
+            case canceled => ()
         }
-        case c => toast("unexpected response Code %s" format c)
-      }
+      // cropped
+      case n if((n & (1<<4)) > 0) =>
+         resCode match {
+           case Activity.RESULT_OK =>
+             val dig = n & ~(1<<4)
+             if(croppedFile(dig).exists) {
+               edit(DigitsPref) {
+                 _.putString(
+                   "i_%s" format dig,
+                   croppedFile(dig).getAbsolutePath
+                 )
+               }
+               tick()
+             } else toast(
+               "failed to retrieve preferred image %s" format croppedUri(dig)
+             )
+           case canceled => ()
+         }
+      case code => toast("unexpected request Code %s" format code)
+    }
 
-  protected override def onPause() {
-    super.onPause()
-    sensorManager.unregisterListener(sense)
-  }
+  private def preferred(n: Int) =
+    prefs(DigitsPref).getString("i_%s" format n, null) match {
+      case null => None
+      case url => stored(url)
+    }
 
-  protected override def onResume() {
-    super.onResume()
-    /*sensorManager.registerListener(
-       sense,
-       sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER),
-       SensorManager.SENSOR_DELAY_UI
-    )*/
-  }
+  private def stored(path: String) =
+   Images.Media.getBitmap(getContentResolver(), uri(path)) match {
+     case null => None
+     case bm => Some(bm)
+   }
+
+  private def croppedUri(n: Int) =
+    Uri.fromFile(croppedFile(n))
+
+  private def uri(path: String) =
+    Uri.fromFile(new File(path))
 
   private def croppedFile(n: Int) =
-    Uri.fromFile(new File(
-      Env.getExternalStorageDirectory(), "tickpic_%s.jpg" format n
-    ))
+    new File(
+       Env.getExternalStorageDirectory(), "tickpic_%s.jpg" format n
+    )
 
   private def view[T <: View](id: Int): T = findViewById(id).asInstanceOf[T]
 
   private def applyNum(pv: PicView, n: Int) =
     try {
-      Images.Media.getBitmap(getContentResolver(), croppedFile(n)) match {
-        case null => pv.setImageResource(default(n))
-        case bm => pv.setImageBitmap(bm)
+      preferred(n) match {
+        case None =>
+          pv.setImageResource(default(n))
+        case Some(bm) =>
+          pv.setImageBitmap(bm)
       }
     } catch { case _ =>
       pv.setImageResource(default(n))

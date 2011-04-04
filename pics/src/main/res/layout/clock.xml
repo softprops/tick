@@ -10,25 +10,37 @@
                 android:gravity="center"
                 android:layout_weight="1">
     <me.lessis.PicViewL android:id="@+id/h_tens"
-               android:layout_width="wrap_content"
-               android:layout_height="wrap_content"
+               android:layout_width="125dip"
+               android:maxWidth="125dip"
+               android:layout_height="220dip"
+               android:maxHeight="220dip"
+               android:scaleType="centerCrop"
                android:gravity="center">
     </me.lessis.PicViewL>
     <me.lessis.PicViewR android:id="@+id/h_ones"
-               android:layout_width="wrap_content"
-               android:layout_height="fill_parent"
+               android:layout_width="125dip"
+               android:maxWidth="125dip"
+               android:layout_height="220dip"
+               android:maxHeight="220dip"
+               android:scaleType="centerCrop"
                android:gravity="center"
                android:layout_marginRight="10dip">
     </me.lessis.PicViewR>
     <me.lessis.PicViewL android:id="@+id/m_tens"
-               android:layout_width="wrap_content"
-               android:layout_height="fill_parent"
+               android:layout_width="125dip"
+               android:maxWidth="125dip"
+               android:layout_height="220dip"
+               android:maxHeight="220dip"
+               android:scaleType="centerCrop"
                android:gravity="center"
                android:layout_marginLeft="10dip">
     </me.lessis.PicViewL>
     <me.lessis.PicViewR android:id="@+id/m_ones"
-               android:layout_width="wrap_content"
-               android:layout_height="fill_parent"
+               android:layout_width="125dip"
+               android:maxWidth="125dip"
+               android:layout_height="220dip"
+               android:maxHeight="220dip"
+               android:scaleType="centerCrop"
                android:gravity="center">
     </me.lessis.PicViewR>
   </LinearLayout>
@@ -44,7 +56,6 @@
                 android:typeface="serif"
                 android:textSize="30dip"
                 android:textStyle="italic"
-                android:background="@drawable/roundcorner"
                 android:drawablePadding="10dip">
       </TextView>
   </LinearLayout>
