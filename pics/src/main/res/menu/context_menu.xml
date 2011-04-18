@@ -3,7 +3,7 @@
     <item android:id="@+id/use_device"
           android:title="@string/use_device" >
     </item>
-    <item android:id="@+id/use_picplz"
-          android:title="@string/use_picplz">
+     <item android:id="@+id/use_instagram"
+          android:title="@string/use_instagram">
     </item>
 </menu>

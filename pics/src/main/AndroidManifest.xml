@@ -1,10 +1,11 @@
-<manifest android:versionName="0.1"
+<manifest android:versionName="1.0"
           android:versionCode="1"
           package="me.lessis"
           xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-sdk android:minSdkVersion="8"></uses-sdk>
     <application android:icon="@drawable/android:ic_menu_camera"
                  android:label="@string/app_name">
+
       <activity android:label="@string/app_name"
                 android:name=".MainActivity"
                 android:screenOrientation="landscape">
@@ -17,7 +18,15 @@
            <data android:scheme="picsee" />
           </intent-filter>
       </activity>
-      <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+      <activity android:name=".RemotePicsActivity"
+                android:label="remote pics">
+        <intent-filter>
+          <action android:name="android.intent.action.MAIN"/>
+        </intent-filter>
+      </activity>
+    </application>
+  <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
       <uses-permission android:name="android.permission.DELETE_EXTERNAL_STORAGE" />
-    </application>>
+      <uses-permission android:name="android.permission.INTERNET"/>
+     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
 </manifest>
